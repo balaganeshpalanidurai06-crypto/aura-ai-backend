@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import Webcam from "react-webcam";
 
-const API_URL = 'http://localhost:5000';
+const API_URL = 'https://talking-tom-ai-delta.vercel.app';
 
 const FEATURE_INFO = {
   voice: {
@@ -322,27 +322,25 @@ const App = () => {
     } catch { alert("Failed to fetch weather"); }
     setWeatherLoading(false);
   };
+
   const loadHistory = async (emailOverride) => {
-  setHistoryLoading(true);
-  try {
-    const email = emailOverride || userEmail;
-    console.log('Loading history for:', email);
-    
-    if (!email || email === 'guest') {
+    setHistoryLoading(true);
+    try {
+      const email = emailOverride || userEmail;
+      if (!email || email === 'guest') {
+        setAllHistory([]);
+        setHistoryLoading(false);
+        return;
+      }
+      const response = await axios.get(`${API_URL}/api/all-history?email=${encodeURIComponent(email)}`);
+      setAllHistory(response.data || []);
+    } catch (err) {
+      console.error('Load history error:', err);
       setAllHistory([]);
-      setHistoryLoading(false);
-      return;
     }
-    
-    const response = await axios.get(`${API_URL}/api/all-history?email=${encodeURIComponent(email)}`);
-    console.log('History response:', response.data);
-    setAllHistory(response.data || []);
-  } catch (err) {
-    console.error('Load history error:', err);
-    setAllHistory([]);
-  }
-  setHistoryLoading(false);
-};
+    setHistoryLoading(false);
+  };
+
   const deleteHistory = async (id) => {
     if (!window.confirm("Delete this conversation?")) return;
     try {
