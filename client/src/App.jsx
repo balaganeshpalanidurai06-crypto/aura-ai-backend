@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import Webcam from "react-webcam";
 
+const API_URL = 'http://localhost:5000';
+
 const FEATURE_INFO = {
   voice: {
     icon: "🎙️", label: "AI VOICE", sub: "ASSISTANT", color: "#4aff9e",
@@ -58,80 +60,78 @@ const DEFAULT_SETTINGS = {
 };
 
 const App = () => {
-  const [allHistory, setAllHistory]         = useState([]);
-  const [isListening, setIsListening]       = useState(false);
-  const [currentText, setCurrentText]       = useState("");
-  const [loading, setLoading]               = useState(false);
+  const [allHistory, setAllHistory] = useState([]);
+  const [isListening, setIsListening] = useState(false);
+  const [currentText, setCurrentText] = useState("");
+  const [loading, setLoading] = useState(false);
   const [finalSentences, setFinalSentences] = useState([]);
-  const [aiAnswer, setAiAnswer]             = useState("");
-  const [isSpeaking, setIsSpeaking]         = useState(false);
-  const [waveValues, setWaveValues]         = useState(Array(30).fill(4));
-  const [activeFeature, setActiveFeature]   = useState(null);
+  const [aiAnswer, setAiAnswer] = useState("");
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [waveValues, setWaveValues] = useState(Array(30).fill(4));
+  const [activeFeature, setActiveFeature] = useState(null);
   const [hoveredFeature, setHoveredFeature] = useState(null);
-  const [showHistory, setShowHistory]       = useState(false);
-  const [chatMessages, setChatMessages]     = useState([]);
-  const [chatInput, setChatInput]           = useState("");
+  const [showHistory, setShowHistory] = useState(false);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState("");
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [isTyping, setIsTyping]             = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   const [settings, setSettings] = useState(() => {
     try { const s = localStorage.getItem('aura_settings'); return s ? { ...DEFAULT_SETTINGS, ...JSON.parse(s) } : DEFAULT_SETTINGS; }
     catch { return DEFAULT_SETTINGS; }
   });
-  const [showSettings, setShowSettings]   = useState(false);
-  const [settingsTab, setSettingsTab]     = useState('general');
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState('general');
 
   const [user, setUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem('aura_user')); } catch { return null; }
   });
   const [showUserModal, setShowUserModal] = useState(false);
-  const [loginStep, setLoginStep]         = useState('main');
-  const [loginEmail, setLoginEmail]       = useState('');
-  const [loginOtp, setLoginOtp]           = useState('');
-  const [loginLoading, setLoginLoading]   = useState(false);
-  const [loginError, setLoginError]       = useState('');
+  const [loginStep, setLoginStep] = useState('main');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginOtp, setLoginOtp] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState('');
 
-  const [weatherData, setWeatherData]           = useState({ temp: "27°C", description: "Mostly cloudy", location: "Chennai" });
+  const [weatherData, setWeatherData] = useState({ temp: "27°C", description: "Mostly cloudy", location: "Chennai" });
   const [showWeatherSearch, setShowWeatherSearch] = useState(false);
-  const [searchCity, setSearchCity]             = useState("");
-  const [weatherLoading, setWeatherLoading]     = useState(false);
+  const [searchCity, setSearchCity] = useState("");
+  const [weatherLoading, setWeatherLoading] = useState(false);
 
-  const [news, setNews]                       = useState([]);
-  const [newsLoading, setNewsLoading]         = useState(false);
+  const [news, setNews] = useState([]);
+  const [newsLoading, setNewsLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("general");
-  const [readingNews, setReadingNews]         = useState(false);
-  const [newsCache, setNewsCache]             = useState({});
-  const [lastFetchTime, setLastFetchTime]     = useState({});
+  const [readingNews, setReadingNews] = useState(false);
+  const [newsCache, setNewsCache] = useState({});
+  const [lastFetchTime, setLastFetchTime] = useState({});
 
-  const [selectedImage, setSelectedImage]   = useState(null);
-  const [imagePreview, setImagePreview]     = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
   const [visionQuestion, setVisionQuestion] = useState("");
-  const [visionAnswer, setVisionAnswer]     = useState("");
-  const [visionLoading, setVisionLoading]   = useState(false);
-  const [showCamera, setShowCamera]         = useState(false);
-  const [cameraPhoto, setCameraPhoto]       = useState(null);
+  const [visionAnswer, setVisionAnswer] = useState("");
+  const [visionLoading, setVisionLoading] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraPhoto, setCameraPhoto] = useState(null);
 
   const recognitionRef = useRef(null);
-  const waveAnimRef    = useRef(null);
-  const fileInputRef   = useRef(null);
-  const webcamRef      = useRef(null);
+  const waveAnimRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const webcamRef = useRef(null);
 
   const backgroundVideoUrl = "Iron Man Avengers Infinity War Version Marvel Desktop Live Wallpaper-1078p.mp4";
 
   const categories = [
-    { id: "general",       name: "📰 Top News",       emoji: "📰" },
-    { id: "technology",    name: "💻 Technology",     emoji: "💻" },
-    { id: "business",      name: "💰 Business",       emoji: "💰" },
-    { id: "entertainment", name: "🎬 Entertainment",  emoji: "🎬" },
-    { id: "sports",        name: "⚽ Sports",          emoji: "⚽" },
-    { id: "science",       name: "🔬 Science",         emoji: "🔬" },
-    { id: "health",        name: "🏥 Health",          emoji: "🏥" },
+    { id: "general", name: "📰 Top News", emoji: "📰" },
+    { id: "technology", name: "💻 Technology", emoji: "💻" },
+    { id: "business", name: "💰 Business", emoji: "💰" },
+    { id: "entertainment", name: "🎬 Entertainment", emoji: "🎬" },
+    { id: "sports", name: "⚽ Sports", emoji: "⚽" },
+    { id: "science", name: "🔬 Science", emoji: "🔬" },
+    { id: "health", name: "🏥 Health", emoji: "🏥" },
   ];
 
-  // ── Current user's email for history tagging ──────────────────────────────
   const userEmail = user?.email || 'guest';
-  // ─────────────────────────────────────────────────────────────────────────
 
   const updateSettings = (key, value) => {
     const ns = { ...settings, [key]: value };
@@ -158,7 +158,7 @@ const App = () => {
     if (!loginEmail || !loginEmail.includes('@')) { setLoginError('Please enter a valid email address.'); return; }
     setLoginLoading(true); setLoginError('');
     try {
-      const res = await axios.post('http://localhost:5000/api/send-otp', { email: loginEmail });
+      const res = await axios.post(`${API_URL}/api/send-otp`, { email: loginEmail });
       if (res.data.success) {
         setLoginStep('otp');
         if (res.data.dev) setLoginError('⚠️ Dev mode: Check server console for OTP.');
@@ -171,7 +171,7 @@ const App = () => {
     if (!loginOtp || loginOtp.length !== 6) { setLoginError('Please enter the 6-digit code.'); return; }
     setLoginLoading(true); setLoginError('');
     try {
-      const res = await axios.post('http://localhost:5000/api/verify-otp', { email: loginEmail, otp: loginOtp });
+      const res = await axios.post(`${API_URL}/api/verify-otp`, { email: loginEmail, otp: loginOtp });
       if (res.data.success) {
         const newUser = { email: loginEmail, name: loginEmail.split('@')[0], loggedIn: true };
         setUser(newUser);
@@ -184,8 +184,8 @@ const App = () => {
   };
 
   const logout = () => {
-    setUser(null); 
-    localStorage.removeItem('aura_user'); 
+    setUser(null);
+    localStorage.removeItem('aura_user');
     setShowUserModal(false);
     setAllHistory([]);
   };
@@ -196,7 +196,7 @@ const App = () => {
     if (!window.confirm('Clear ALL your conversation history? This cannot be undone.')) return;
     try {
       for (const item of allHistory) {
-        await axios.delete(`http://localhost:5000/api/history/${item.id}`);
+        await axios.delete(`${API_URL}/api/history/${item.id}`);
       }
       loadHistory(userEmail);
       alert('✅ History cleared!');
@@ -225,38 +225,30 @@ const App = () => {
         {title:"India's GDP grows at 8.2% in Q4",description:"Economy shows strong recovery momentum",source:{name:"Economic Times"},publishedAt:new Date().toISOString()},
         {title:"New space mission announced by ISRO",description:"India's next lunar mission scheduled",source:{name:"The Hindu"},publishedAt:new Date().toISOString()},
         {title:"Digital India reaches 1 billion users",description:"Internet penetration grows rapidly",source:{name:"Times of India"},publishedAt:new Date().toISOString()},
-        {title:"Monsoon: Above average rainfall expected",description:"IMD announces positive outlook",source:{name:"Indian Express"},publishedAt:new Date().toISOString()},
-        {title:"Railways launches high-speed trains",description:"Vande Bharat expansion across routes",source:{name:"Railway Gazette"},publishedAt:new Date().toISOString()},
       ],
       technology: [
         {title:"5G rollout completes across major cities",description:"High-speed internet now available",source:{name:"TechCrunch"},publishedAt:new Date().toISOString()},
         {title:"Indian AI startup raises $50M funding",description:"New developments in generative AI",source:{name:"YourStory"},publishedAt:new Date().toISOString()},
-        {title:"Smartphone exports from India double",description:"Make in India success story",source:{name:"Digit"},publishedAt:new Date().toISOString()},
       ],
       business: [
         {title:"Sensex hits all-time high of 75,000",description:"Markets rally on positive data",source:{name:"Business Standard"},publishedAt:new Date().toISOString()},
         {title:"RBI keeps repo rate at 6.5%",description:"Inflation under control",source:{name:"Financial Express"},publishedAt:new Date().toISOString()},
-        {title:"Foreign investment inflows up 25%",description:"Global confidence in Indian economy",source:{name:"Bloomberg"},publishedAt:new Date().toISOString()},
       ],
       entertainment: [
         {title:"Blockbuster crosses 1000cr worldwide",description:"Indian cinema dominates box office",source:{name:"Filmfare"},publishedAt:new Date().toISOString()},
         {title:"OTT platforms release 50+ originals",description:"Content boom continues",source:{name:"Bollywood Hungama"},publishedAt:new Date().toISOString()},
-        {title:"International music festival in India",description:"Global artists perform in Mumbai",source:{name:"Rolling Stone"},publishedAt:new Date().toISOString()},
       ],
       sports: [
         {title:"India wins cricket series vs Australia",description:"Historic victory in away conditions",source:{name:"ESPN Cricinfo"},publishedAt:new Date().toISOString()},
         {title:"Chess grandmaster wins world championship",description:"India's rising star makes history",source:{name:"Sportstar"},publishedAt:new Date().toISOString()},
-        {title:"Badminton star reaches world number 1",description:"Indian shuttler achieves career best",source:{name:"Sportskeeda"},publishedAt:new Date().toISOString()},
       ],
       science: [
         {title:"ISRO Aditya-L1 captures first images",description:"Solar study reveals new insights",source:{name:"Space.com"},publishedAt:new Date().toISOString()},
         {title:"New species found in Western Ghats",description:"Biodiversity hotspot yields findings",source:{name:"Nature India"},publishedAt:new Date().toISOString()},
-        {title:"Quantum computing breakthrough in India",description:"IIT researchers achieve milestone",source:{name:"Science Daily"},publishedAt:new Date().toISOString()},
       ],
       health: [
         {title:"Ayushman Bharat covers 500M families",description:"World's largest health scheme",source:{name:"WHO India"},publishedAt:new Date().toISOString()},
         {title:"New cancer treatment center opens",description:"Advanced care in tier-2 cities",source:{name:"Medical News"},publishedAt:new Date().toISOString()},
-        {title:"Telemedicine usage grows 300%",description:"Digital health revolution",source:{name:"Healthline"},publishedAt:new Date().toISOString()},
       ],
     };
     return m[cat] || m.general;
@@ -274,7 +266,7 @@ const App = () => {
       setLastFetchTime(p => ({...p, [category]: now}));
       if (user && user.email !== 'guest') {
         try {
-          await axios.post("http://localhost:5000/api/save-history", {
+          await axios.post(`${API_URL}/api/save-history`, {
             type:"news", question:`📰 Read ${category} news`, answer:`Fetched ${final.length} articles`,
             userEmail: user.email
           });
@@ -330,54 +322,52 @@ const App = () => {
     } catch { alert("Failed to fetch weather"); }
     setWeatherLoading(false);
   };
-
-  // ✅ FIXED: loadHistory - properly fetches history for logged-in user
   const loadHistory = async (emailOverride) => {
-    setHistoryLoading(true);
-    try {
-      const email = emailOverride || userEmail;
-      
-      // If no user or guest, show empty history
-      if (!email || email === 'guest') {
-        setAllHistory([]);
-        setHistoryLoading(false);
-        return;
-      }
-      
-      const response = await axios.get(`http://localhost:5000/api/all-history?email=${encodeURIComponent(email)}`);
-      setAllHistory(response.data || []);
-    } catch (err) { 
-      console.error('Load history error:', err);
-      setAllHistory([]); 
+  setHistoryLoading(true);
+  try {
+    const email = emailOverride || userEmail;
+    console.log('Loading history for:', email);
+    
+    if (!email || email === 'guest') {
+      setAllHistory([]);
+      setHistoryLoading(false);
+      return;
     }
-    setHistoryLoading(false);
-  };
-
+    
+    const response = await axios.get(`${API_URL}/api/all-history?email=${encodeURIComponent(email)}`);
+    console.log('History response:', response.data);
+    setAllHistory(response.data || []);
+  } catch (err) {
+    console.error('Load history error:', err);
+    setAllHistory([]);
+  }
+  setHistoryLoading(false);
+};
   const deleteHistory = async (id) => {
     if (!window.confirm("Delete this conversation?")) return;
-    try { 
-      await axios.delete(`http://localhost:5000/api/history/${id}`); 
-      loadHistory(); 
+    try {
+      await axios.delete(`${API_URL}/api/history/${id}`);
+      loadHistory();
     } catch(err) { console.error('Delete error:', err); }
   };
 
-  useEffect(() => { 
+  useEffect(() => {
     if (user && user.email !== 'guest') {
       loadHistory(user.email);
     } else {
       setAllHistory([]);
     }
   }, [user]);
-  
+
   useEffect(() => { if (showHistory && user && user.email !== 'guest') loadHistory(); }, [showHistory]);
-  
+
   useEffect(() => {
     if (isListening || isSpeaking) {
       waveAnimRef.current = setInterval(() => setWaveValues(Array(30).fill(0).map(() => Math.random() * 40 + 4)), 120);
     } else { clearInterval(waveAnimRef.current); setWaveValues(Array(30).fill(4)); }
     return () => clearInterval(waveAnimRef.current);
   }, [isListening, isSpeaking]);
-  
+
   useEffect(() => { if (activeFeature === "news") fetchNews(selectedCategory); }, [activeFeature, selectedCategory]);
   useEffect(() => { const t = setTimeout(() => preloadAllNews(), 2000); return () => clearTimeout(t); }, []);
 
@@ -392,7 +382,7 @@ const App = () => {
   const saveVoiceActivation = async () => {
     if (!user || user.email === 'guest') return;
     try {
-      await axios.post("http://localhost:5000/api/save-history", {
+      await axios.post(`${API_URL}/api/save-history`, {
         type:"voice", question:"🎤 AI Voice Activated", answer:"Voice assistant was activated",
         userEmail: user.email
       });
@@ -403,11 +393,11 @@ const App = () => {
     if (!question.trim()) return;
     setAiAnswer("Thinking...");
     try {
-      const res = await fetch("http://localhost:5000/api/chat", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ message:question }) });
+      const res = await fetch(`${API_URL}/api/chat`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ message:question }) });
       const reader = res.body.getReader(), dec = new TextDecoder("utf-8"); let bot = "";
       while (true) { const { done, value } = await reader.read(); if (done) break; bot += dec.decode(value); setAiAnswer(bot); }
       if (user && user.email !== 'guest') {
-        await axios.post("http://localhost:5000/api/save-history", {
+        await axios.post(`${API_URL}/api/save-history`, {
           type:"voice", question, answer:bot,
           userEmail: user.email
         });
@@ -446,7 +436,7 @@ const App = () => {
     setChatInput(""); setLoading(true); setIsTyping(true);
     const isCode = ["code","python","javascript","java","html","css","example","function"].some(w => message.toLowerCase().includes(w));
     try {
-      const res = await fetch("http://localhost:5000/api/chat", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ message }) });
+      const res = await fetch(`${API_URL}/api/chat`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ message }) });
       const reader = res.body.getReader(), dec = new TextDecoder("utf-8"); let full = "";
       setChatMessages(p => [...p, { role:"assistant", content:"", isStreaming:true, isCode }]);
       while (true) {
@@ -460,7 +450,7 @@ const App = () => {
       if (isCode && (full.includes("```") || full.includes("def ") || full.includes("class "))) final = formatCodeBlocks(full);
       setChatMessages(p => { const m = [...p]; const l = m.length-1; if (m[l]?.role==="assistant") m[l] = {...m[l], content:final, isStreaming:false, isCode}; return m; });
       if (user && user.email !== 'guest') {
-        await axios.post("http://localhost:5000/api/save-history", {
+        await axios.post(`${API_URL}/api/save-history`, {
           type:"chat", question:message, answer:full,
           userEmail: user.email
         });
@@ -543,10 +533,10 @@ const App = () => {
     setVisionLoading(true); setVisionAnswer("Analyzing image...");
     const fd = new FormData(); fd.append("image", selectedImage); fd.append("question", visionQuestion || "Describe this image in detail");
     try {
-      const res = await axios.post("http://localhost:5000/api/vision", fd, { headers:{"Content-Type":"multipart/form-data"} });
+      const res = await axios.post(`${API_URL}/api/vision`, fd, { headers:{"Content-Type":"multipart/form-data"} });
       setVisionAnswer(res.data.response);
       if (user && user.email !== 'guest') {
-        await axios.post("http://localhost:5000/api/save-history", {
+        await axios.post(`${API_URL}/api/save-history`, {
           type:"vision", question:visionQuestion||"Analyzed image", answer:res.data.response,
           userEmail: user.email
         });
@@ -600,7 +590,6 @@ const App = () => {
         @keyframes overlayFade{0%{opacity:0;}30%{opacity:1;}70%{opacity:1;}100%{opacity:0;}}
         @keyframes slideInR{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
         @keyframes modalFadeIn{from{opacity:0;transform:translate(-50%,-48%)}to{opacity:1;transform:translate(-50%,-50%)}}
-
         .feat-btn{background:rgba(0,0,0,0.45);border:1.5px solid rgba(74,255,158,0.25);border-radius:16px;padding:18px;text-align:center;transition:background .25s,transform .2s;cursor:pointer;color:#fff;animation:btnBorderBlink 2s ease-in-out infinite,liteFloat 4s ease-in-out infinite;}
         .feat-btn:hover{background:rgba(74,255,158,0.12);transform:scale(1.04) translateY(-4px);}
         .nav-btn-hover:hover{background:rgba(74,255,158,0.15)!important;border-color:rgba(74,255,158,0.5)!important;}
@@ -620,7 +609,6 @@ const App = () => {
         select { color-scheme: dark; }
       `}</style>
 
-      {/* TOP LEFT: AURA Brand */}
       <div style={S.topLeftBrand}>
         <div>
           <div style={S.brandMain}>AURA</div>
@@ -628,7 +616,6 @@ const App = () => {
         </div>
       </div>
 
-      {/* TOP RIGHT: SYSTEM READY */}
       <div style={S.topRight}>
         {info ? (
           <div style={{...S.systemChip, borderColor:`${info.color}55`}}>
@@ -647,7 +634,6 @@ const App = () => {
         )}
       </div>
 
-      {/* INFO PANEL */}
       {info && (
         <div style={S.infoPanel}>
           <div style={{...S.infoPanelHeader, borderColor:`${info.color}44`}}>
@@ -667,7 +653,6 @@ const App = () => {
         </div>
       )}
 
-      {/* HISTORY SIDEBAR */}
       {showHistory && (
         <>
           <div style={S.historyBackdrop} onClick={() => setShowHistory(false)}/>
@@ -703,7 +688,6 @@ const App = () => {
         </>
       )}
 
-      {/* WEATHER MODAL */}
       {showWeatherSearch && (
         <>
           <div style={S.modalBackdrop} onClick={() => setShowWeatherSearch(false)}/>
@@ -718,7 +702,6 @@ const App = () => {
         </>
       )}
 
-      {/* SETTINGS MODAL */}
       {showSettings && (
         <>
           <div style={S.modalBackdrop} onClick={() => setShowSettings(false)}/>
@@ -729,11 +712,11 @@ const App = () => {
               </div>
               <button onClick={() => setShowSettings(false)} style={S.settingsCloseBtn}>✕</button>
               {[
-                {key:'general',      label:'General',       icon:'⚙️'},
-                {key:'notifications',label:'Notifications', icon:'🔔'},
-                {key:'data',         label:'Data Controls', icon:'🗄️'},
-                {key:'security',     label:'Security',      icon:'🔒'},
-                {key:'account',      label:'Account',       icon:'👤'},
+                {key:'general', label:'General', icon:'⚙️'},
+                {key:'notifications', label:'Notifications', icon:'🔔'},
+                {key:'data', label:'Data Controls', icon:'🗄️'},
+                {key:'security', label:'Security', icon:'🔒'},
+                {key:'account', label:'Account', icon:'👤'},
               ].map(({key,label,icon}) => (
                 <button key={key} className="sett-tab-hover"
                   onClick={() => setSettingsTab(key)}
@@ -767,12 +750,6 @@ const App = () => {
                         <option value="ml-IN">Malayalam (India)</option>
                         <option value="kn-IN">Kannada (India)</option>
                         <option value="bn-IN">Bengali (India)</option>
-                        <option value="fr-FR">French</option>
-                        <option value="de-DE">German</option>
-                        <option value="ja-JP">Japanese</option>
-                        <option value="zh-CN">Chinese (Mandarin)</option>
-                        <option value="ar-SA">Arabic</option>
-                        <option value="es-ES">Spanish</option>
                       </select>
                     )},
                     { label: "Voice Speed", desc: `Playback speed: ${settings.voiceRate}x`, control: (
@@ -789,10 +766,7 @@ const App = () => {
                     )},
                   ].map(({label,desc,control},i) => (
                     <div key={i} style={S.settingRow}>
-                      <div>
-                        <div style={S.settingLabel}>{label}</div>
-                        <div style={S.settingDesc}>{desc}</div>
-                      </div>
+                      <div><div style={S.settingLabel}>{label}</div><div style={S.settingDesc}>{desc}</div></div>
                       {control}
                     </div>
                   ))}
@@ -829,9 +803,7 @@ const App = () => {
                   </div>
                   <div style={{...S.settingRow, flexDirection:"column", alignItems:"flex-start", gap:8}}>
                     <div style={S.settingLabel}>Your History</div>
-                    <div style={{...S.settingDesc, fontSize:11}}>
-                      Account: {user ? user.email : "Guest (not logged in)"} | Records: {allHistory.length}
-                    </div>
+                    <div style={{...S.settingDesc, fontSize:11}}>Account: {user ? user.email : "Guest (not logged in)"} | Records: {allHistory.length}</div>
                   </div>
                 </>
               )}
@@ -863,10 +835,7 @@ const App = () => {
                         <div style={{width:54,height:54,borderRadius:"50%",background:"linear-gradient(135deg,#4aff9e,#38bdf8)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,fontWeight:700,color:"#000"}}>
                           {user.email[0].toUpperCase()}
                         </div>
-                        <div>
-                          <div style={{color:"#fff",fontWeight:600,fontSize:15}}>{user.name || user.email.split('@')[0]}</div>
-                          <div style={{color:"rgba(255,255,255,0.6)",fontSize:12}}>@{user.email}</div>
-                        </div>
+                        <div><div style={{color:"#fff",fontWeight:600,fontSize:15}}>{user.name || user.email.split('@')[0]}</div><div style={{color:"rgba(255,255,255,0.6)",fontSize:12}}>@{user.email}</div></div>
                       </div>
                       <div style={S.settingRow}><div><div style={S.settingLabel}>Email</div><div style={S.settingDesc}>{user.email}</div></div><span style={{color:"#4aff9e",fontSize:11}}>✓ Verified</span></div>
                       <div style={S.settingRow}><div><div style={S.settingLabel}>Plan</div><div style={S.settingDesc}>AURA Free — Full Access</div></div><span style={{color:"#facc15",fontSize:11,fontWeight:600}}>FREE</span></div>
@@ -891,7 +860,6 @@ const App = () => {
         </>
       )}
 
-      {/* USER / LOGIN MODAL */}
       {showUserModal && (
         <>
           <div style={S.modalBackdrop} onClick={() => setShowUserModal(false)}/>
@@ -918,9 +886,9 @@ const App = () => {
                 <h2 style={S.loginTitle}>Log in or sign up</h2>
                 <p style={S.loginSubtitle}>You'll get smarter responses and can access your personal history, preferences, and more.</p>
                 {[
-                  { icon: "🇬", label: "Continue with Google",  onClick: () => alert("Google sign-in coming soon! Use email OTP below.") },
-                  { icon: "🍎", label: "Continue with Apple",   onClick: () => alert("Apple sign-in coming soon! Use email OTP below.") },
-                  { icon: "📞", label: "Continue with phone",   onClick: () => alert("Phone sign-in coming soon! Use email OTP below.") },
+                  { icon: "🇬", label: "Continue with Google", onClick: () => alert("Google sign-in coming soon! Use email OTP below.") },
+                  { icon: "🍎", label: "Continue with Apple", onClick: () => alert("Apple sign-in coming soon! Use email OTP below.") },
+                  { icon: "📞", label: "Continue with phone", onClick: () => alert("Phone sign-in coming soon! Use email OTP below.") },
                 ].map(({ icon, label, onClick }) => (
                   <button key={label} className="social-btn-hover" onClick={onClick} style={S.socialBtn}>
                     <span style={{fontSize:16}}>{icon}</span>
@@ -964,18 +932,15 @@ const App = () => {
         </>
       )}
 
-      {/* ── MAIN ── */}
       <div style={S.main}>
         <div style={S.hero}>
-
-          {/* FEATURE GRID */}
           {!activeFeature && !isTransitioning && (
             <div style={{...S.featureGrid, position:"absolute", left:60, top:"50%", transform:"translateY(-50%)", marginTop:0}}>
               {[
-                {k:"voice",   label:"AI VOICE",  val:"ASSISTANT", ic:"🎙️"},
-                {k:"chatbot", label:"CHATBOT",    val:"ASSISTANT", ic:"💬"},
-                {k:"lense",   label:"AI LENSE",   val:"VISION",    ic:"📷"},
-                {k:"news",    label:"AI NEWS",    val:"READER",    ic:"📰"},
+                {k:"voice", label:"AI VOICE", val:"ASSISTANT", ic:"🎙️"},
+                {k:"chatbot", label:"CHATBOT", val:"ASSISTANT", ic:"💬"},
+                {k:"lense", label:"AI LENSE", val:"VISION", ic:"📷"},
+                {k:"news", label:"AI NEWS", val:"READER", ic:"📰"},
               ].map(({k,label,val,ic}) => (
                 <button key={k} className="feat-btn"
                   onClick={() => handleFeatureClick(k)}
@@ -990,7 +955,6 @@ const App = () => {
             </div>
           )}
 
-          {/* VOICE SECTION */}
           {activeFeature === "voice" && !isTransitioning && (
             <div style={S.voiceSection}>
               <div style={S.waveContainer}>{waveValues.map((h,i) => (<div key={i} style={{...S.waveBar, height:`${Math.max(4,h)}px`, backgroundColor:isSpeaking?"#4aff9e":isListening?"#3a86ff":"rgba(255,255,255,0.5)"}}/>))}</div>
@@ -1008,21 +972,14 @@ const App = () => {
             </div>
           )}
 
-          {/* CHATBOT SECTION */}
           {activeFeature === "chatbot" && !isTransitioning && (
             <div style={S.chatbotSection}>
-              <div style={S.chatHeader}>
-                <span style={S.chatHeaderTitle}>💬 AI CHAT</span>
-                {chatMessages.length>0&&<button onClick={downloadChat} style={S.downloadChatBtn}>📥 Download</button>}
-              </div>
+              <div style={S.chatHeader}><span style={S.chatHeaderTitle}>💬 AI CHAT</span>{chatMessages.length>0&&<button onClick={downloadChat} style={S.downloadChatBtn}>📥 Download</button>}</div>
               <div style={S.chatMessages}>
                 {chatMessages.length===0?(<div style={S.emptyChat}>Start a conversation with AI...</div>):(
                   chatMessages.map((msg,idx)=>(
                     <div key={idx} style={{...S.chatBubble,...(msg.role==="user"?S.userBubble:S.aiBubble)}}>
-                      <div style={S.chatBubbleHeader}>
-                        <strong>{msg.role==="user"?"You":"AI"}</strong>
-                        {msg.role==="assistant"&&msg.content&&!msg.isError&&<button onClick={()=>copyToClipboard(msg.content)} style={S.copyBtn}>📋</button>}
-                      </div>
+                      <div style={S.chatBubbleHeader}><strong>{msg.role==="user"?"You":"AI"}</strong>{msg.role==="assistant"&&msg.content&&!msg.isError&&<button onClick={()=>copyToClipboard(msg.content)} style={S.copyBtn}>📋</button>}</div>
                       <div style={S.chatBubbleContent} dangerouslySetInnerHTML={{__html:msg.content}}/>
                       {msg.isStreaming&&<span style={S.typingCursor}>|</span>}
                     </div>
@@ -1038,7 +995,6 @@ const App = () => {
             </div>
           )}
 
-          {/* LENSE SECTION */}
           {activeFeature === "lense" && !isTransitioning && (
             <div style={S.lenseSection}>
               <div style={S.lenseHeader}><span style={S.lenseIcon}>📷</span><span style={S.lenseTitle}>AI LENSE</span><span style={S.lenseSubtitle}>Capture or upload an image and ask anything</span></div>
@@ -1056,7 +1012,6 @@ const App = () => {
             </div>
           )}
 
-          {/* NEWS SECTION */}
           {activeFeature === "news" && !isTransitioning && (
             <div style={{...S.newsSection, ...(info ? {marginRight:300, maxWidth:680} : {})}}>
               <div style={S.newsHeader}><span style={S.newsIcon}>📰</span><span style={S.newsTitle}>LATEST NEWS</span><span style={S.newsCount}>{news.length} articles</span><button onClick={()=>fetchNews(selectedCategory)} style={S.newsRefreshBtn} disabled={newsLoading}>{newsLoading?"⟳":"🔄"}</button>{readingNews&&<button onClick={stopReading} style={S.newsStopBtn}>⏹️ Stop</button>}</div>
@@ -1077,11 +1032,9 @@ const App = () => {
               <button onClick={handleBackToMenu} style={S.backToMenuBtn}>← Back to Menu</button>
             </div>
           )}
-
         </div>
       </div>
 
-      {/* WEATHER CARD - bottom right */}
       {!activeFeature && !isTransitioning && (
         <div style={S.weatherCardFixed}>
           <span style={S.temp}>{weatherData.temp}</span>
@@ -1091,7 +1044,6 @@ const App = () => {
         </div>
       )}
 
-      {/* BOTTOM-RIGHT NAV */}
       <div style={S.bottomNav}>
         <button className="nav-btn-hover" onClick={() => setShowHistory(!showHistory)} style={S.navBtn}>📋 History</button>
         <button className="nav-btn-hover" onClick={() => { setShowSettings(true); setSettingsTab('general'); }} style={S.navBtn}>⚙️ Settings</button>
@@ -1101,23 +1053,18 @@ const App = () => {
         </button>
       </div>
 
-      {/* BOTTOM-LEFT DISCLAIMER */}
       <div style={S.bottomLeftDisclaimer}>AURA is AI and can make mistakes</div>
-
     </div>
   );
 };
 
-/* ══════════════════════ STYLES ══════════════════════ */
 const S = {
   root: { position:"relative",display:"flex",height:"100vh",width:"100vw",overflow:"hidden",fontFamily:"'Inter',sans-serif" },
   fadeOverlay: { position:"fixed",top:0,left:0,width:"100%",height:"100%",backgroundColor:"rgba(0,0,0,0.35)",zIndex:9999,pointerEvents:"none",animation:"overlayFade 1.2s ease forwards" },
   backgroundVideo: { position:"absolute",top:0,left:0,width:"100%",height:"100%",objectFit:"cover",objectPosition:"center",zIndex:0,pointerEvents:"none" },
-
   topLeftBrand: { position:"fixed",top:20,left:24,zIndex:100,display:"flex",alignItems:"center",gap:10,background:"rgba(0,0,0,0.45)",backdropFilter:"blur(10px)",borderRadius:14,padding:"8px 18px",border:"1px solid rgba(74,255,158,0.3)" },
   brandMain: { fontSize:22, fontWeight:800, fontFamily:"'Orbitron',sans-serif", color:"#4aff9e", letterSpacing:2, lineHeight:1.2 },
   brandSub: { fontSize:7,fontWeight:500,color:"rgba(255,255,255,0.7)",letterSpacing:1.5,fontFamily:"'Orbitron',sans-serif" },
-
   bottomLeftDisclaimer: { position:"fixed",bottom:20,left:24,zIndex:100,background:"rgba(0,0,0,0.4)",backdropFilter:"blur(8px)",padding:"6px 14px",borderRadius:20,fontSize:10,color:"rgba(255,255,255,0.55)",letterSpacing:0.5,border:"1px solid rgba(255,255,255,0.1)" },
   topRight: { position:"fixed",top:18,right:24,zIndex:100,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8 },
   statusChip: { display:"flex",alignItems:"center",gap:8 },
@@ -1127,7 +1074,6 @@ const S = {
   infoPanelHeader: { display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:"rgba(0,0,0,0.3)",borderBottom:"1px solid rgba(74,255,158,0.15)" },
   infoTable: { width:"100%",borderCollapse:"collapse" },
   infoTd: { padding:"5px 12px",verticalAlign:"middle" },
-
   historyBackdrop: { position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.2)",zIndex:200 },
   historySidebar: { position:"fixed",top:0,left:0,width:380,height:"100vh",background:"rgba(10,10,10,0.3)",backdropFilter:"blur(25px)",borderRight:"1px solid rgba(255,255,255,0.1)",zIndex:201,animation:"slideIn .3s ease",display:"flex",flexDirection:"column" },
   historyHeader: { display:"flex",justifyContent:"space-between",alignItems:"center",padding:20,borderBottom:"1px solid rgba(255,255,255,0.1)",color:"#fff",fontWeight:600,background:"rgba(0,0,0,0.2)" },
@@ -1141,7 +1087,6 @@ const S = {
   historyTimestamp: { fontSize:9,color:"rgba(255,255,255,0.4)",letterSpacing:.5 },
   deleteBtnSidebar: { background:"rgba(255,255,255,0.1)",border:"none",color:"#fff",cursor:"pointer",padding:"6px 10px",borderRadius:6,fontSize:12,height:32 },
   noHistory: { textAlign:"center",color:"rgba(255,255,255,0.5)",padding:40,fontSize:13 },
-
   modalBackdrop: { position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.6)",zIndex:300,backdropFilter:"blur(6px)" },
   weatherModal: { position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:400,background:"rgba(20,20,30,0.95)",backdropFilter:"blur(20px)",borderRadius:16,border:"1px solid rgba(74,255,158,0.3)",zIndex:301,animation:"modalFadeIn .2s ease" },
   weatherModalHeader: { display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 20px",borderBottom:"1px solid rgba(255,255,255,0.1)",color:"#fff",fontWeight:600 },
@@ -1150,7 +1095,6 @@ const S = {
   weatherSearchInput: { padding:12,background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:8,color:"#fff",fontSize:14,outline:"none" },
   weatherSearchBtn: { padding:12,background:"rgba(74,255,158,0.2)",border:"1px solid rgba(74,255,158,0.3)",borderRadius:8,color:"#4aff9e",cursor:"pointer",fontSize:14,fontWeight:500 },
   weatherExample: { fontSize:11,color:"rgba(255,255,255,0.5)",textAlign:"center" },
-
   settingsModal: { position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:760,height:520,background:"rgba(12,14,20,0.97)",backdropFilter:"blur(24px)",borderRadius:20,border:"1px solid rgba(255,255,255,0.1)",zIndex:301,display:"flex",overflow:"hidden",animation:"modalFadeIn .25s ease" },
   settingsSidebar: { width:200,background:"rgba(0,0,0,0.3)",borderRight:"1px solid rgba(255,255,255,0.08)",padding:"20px 12px",display:"flex",flexDirection:"column",gap:4,position:"relative" },
   settingsSidebarTitle: { padding:"0 8px 16px",borderBottom:"1px solid rgba(255,255,255,0.08)",marginBottom:8 },
@@ -1168,7 +1112,6 @@ const S = {
   dangerBtn: { padding:"8px 16px",background:"rgba(255,68,68,0.15)",border:"1px solid rgba(255,68,68,0.3)",borderRadius:8,color:"#ff6b6b",cursor:"pointer",fontSize:12,fontWeight:600 },
   toggle: { width:44,height:24,borderRadius:12,cursor:"pointer",transition:"background .2s",position:"relative",display:"flex",alignItems:"center",padding:"0 2px" },
   toggleKnob: { width:20,height:20,borderRadius:"50%",background:"#fff",transition:"transform .2s",position:"absolute" },
-
   userModal: { position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:460,background:"rgba(16,16,22,0.97)",backdropFilter:"blur(24px)",borderRadius:20,border:"1px solid rgba(255,255,255,0.1)",zIndex:301,padding:"40px 36px 32px",animation:"modalFadeIn .25s ease",maxHeight:"90vh",overflowY:"auto" },
   userModalClose: { position:"absolute",top:16,right:16,background:"rgba(255,255,255,0.08)",border:"none",color:"rgba(255,255,255,0.6)",fontSize:16,cursor:"pointer",padding:"4px 10px",borderRadius:8,lineHeight:1 },
   loginTitle: { color:"#fff",fontSize:24,fontWeight:700,textAlign:"center",marginBottom:10 },
@@ -1179,24 +1122,19 @@ const S = {
   loginError: { color:"#ff6b6b",fontSize:12,textAlign:"center",padding:"8px 12px",background:"rgba(255,68,68,0.1)",borderRadius:8,marginBottom:10 },
   continueBtn: { width:"100%",padding:14,background:"#fff",border:"none",borderRadius:12,color:"#000",cursor:"pointer",fontSize:14,fontWeight:700,marginBottom:10,transition:"opacity .2s" },
   backLoginBtn: { width:"100%",padding:10,background:"none",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"rgba(255,255,255,0.5)",cursor:"pointer",fontSize:13 },
-
   weatherCardFixed: { position:"fixed", bottom:70, right:20, zIndex:100, display:"flex", alignItems:"center", gap:12, background:"rgba(0,0,0,0.55)", border:"1px solid rgba(255,255,255,0.18)", borderRadius:16, padding:"9px 18px", backdropFilter:"blur(12px)" },
-
   bottomNav: { position:"fixed",bottom:20,right:20,zIndex:100,display:"flex",gap:10,alignItems:"center" },
   navBtn: { padding:"9px 18px",background:"rgba(0,0,0,0.55)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:22,color:"#fff",cursor:"pointer",fontSize:12,fontWeight:500,backdropFilter:"blur(10px)",transition:"all .2s",letterSpacing:.3 },
-
   main: { position:"relative",flex:1,overflowY:"auto",zIndex:2 },
   hero: { minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:28,padding:"40px 50px 80px" },
   featureGrid: { display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:20,width:"100%",maxWidth:460 },
   featureLabel: { fontSize:11,color:"rgba(255,255,255,0.7)",letterSpacing:"1px",marginBottom:5 },
   featureValue: { fontSize:13,fontWeight:600,color:"#4aff9e",letterSpacing:"1px" },
-
   weatherCard: { display:"flex",alignItems:"center",gap:15,background:"rgba(0,0,0,0.45)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:16,padding:"10px 20px" },
   temp: { fontSize:16,fontWeight:700,color:"#fff" },
   weatherDesc: { fontSize:11,color:"rgba(255,255,255,0.85)",fontWeight:500 },
   locationText: { fontSize:11,color:"#4aff9e",marginLeft:"auto",fontWeight:600 },
   searchIconBtn: { background:"rgba(0,0,0,0.4)",border:"1px solid rgba(255,255,255,0.2)",fontSize:13,cursor:"pointer",color:"#fff",padding:"4px 8px",borderRadius:10,marginLeft:5 },
-
   voiceSection: { width:"100%",display:"flex",flexDirection:"column",alignItems:"center",gap:22,marginTop:10 },
   waveContainer: { display:"flex",gap:4,alignItems:"center",justifyContent:"center",height:50 },
   waveBar: { width:3,borderRadius:2,transition:"height .1s ease" },
