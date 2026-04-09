@@ -3,7 +3,7 @@ import axios from "axios";
 import Webcam from "react-webcam";
 
 // ✅ ONLY THIS LINE CHANGED - Using your WORKING Render backend
-const API_URL = 'https://aura-ai-backend-2.onrender.com';
+const API_URL = 'https://aura-ai-backend-4.onrender.com';
 
 
 const FEATURE_INFO = {

@@ -8,16 +8,20 @@ const { translate } = require('@vitalets/google-translate-api');
 const OpenAI = require('openai');
 const Groq = require('groq-sdk');
 const sharp = require('sharp');
-const { Resend } = require('resend');
+const SibApiV3Sdk = require('@getbrevo/brevo');
 
 require('dotenv').config();
 
 const EMAIL_USER = process.env.EMAIL_USER || 'balaganeshpalanidurai06@gmail.com';
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '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';
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const PORT = process.env.PORT || 5000;
 
-const resend = new Resend(RESEND_API_KEY);
+// ✅ Brevo setup
+let defaultClient = SibApiV3Sdk.ApiClient.instance;
+let apiKey = defaultClient.authentications['api-key'];
+apiKey.apiKey = BREVO_API_KEY;
+let apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
 
 const openrouter = new OpenAI({
   apiKey: OPENROUTER_API_KEY,
@@ -163,7 +167,7 @@ app.post('/api/vision', upload.single('image'), async (req, res) => {
   }
 });
 
-// ✅ OTP ENDPOINT - Using Resend API
+// ✅ OTP ENDPOINT - Using Brevo API (No domain verification needed!)
 app.post('/api/send-otp', async (req, res) => {
   const { email } = req.body;
   if (!email || !email.includes('@')) return res.status(400).json({ error: 'Valid email required' });
@@ -174,22 +178,21 @@ app.post('/api/send-otp', async (req, res) => {
   console.log(`📧 Sending OTP to ${email}: ${otp}`);
   
   try {
-    const { data, error } = await resend.emails.send({
-      from: 'onboarding@resend.dev',
-      to: email,
-      subject: 'AURA AI — Your Verification Code',
-      html: `<div style="font-family:'Segoe UI',sans-serif;max-width:420px;margin:auto;padding:32px;background:#0d1117;border-radius:16px;border:1px solid #1a2a1a;">
-        <div style="text-align:center;margin-bottom:24px;">
-          <span style="font-size:28px;font-weight:900;letter-spacing:3px;color:#4aff9e;">AURA</span>
-          <div style="font-size:10px;color:#666;letter-spacing:2px;margin-top:2px;">ADVANCED ROBOTIC ASSISTANT</div>
-        </div>
-        <p style="color:#ccc;font-size:14px;margin-bottom:8px;">Your verification code:</p>
-        <div style="font-size:42px;font-weight:900;color:#4aff9e;letter-spacing:12px;text-align:center;padding:20px 0;border:1px solid #4aff9e33;border-radius:12px;background:#0a1a0a;">${otp}</div>
-        <p style="color:#666;font-size:12px;margin-top:20px;text-align:center;">Valid for <strong style="color:#4aff9e;">10 minutes</strong>. Do not share this code with anyone.</p>
-      </div>`
-    });
+    let sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+    sendSmtpEmail.subject = 'AURA AI — Your Verification Code';
+    sendSmtpEmail.sender = { name: 'AURA AI', email: EMAIL_USER };
+    sendSmtpEmail.to = [{ email: email }];
+    sendSmtpEmail.htmlContent = `<div style="font-family:'Segoe UI',sans-serif;max-width:420px;margin:auto;padding:32px;background:#0d1117;border-radius:16px;border:1px solid #1a2a1a;">
+      <div style="text-align:center;margin-bottom:24px;">
+        <span style="font-size:28px;font-weight:900;letter-spacing:3px;color:#4aff9e;">AURA</span>
+        <div style="font-size:10px;color:#666;letter-spacing:2px;margin-top:2px;">ADVANCED ROBOTIC ASSISTANT</div>
+      </div>
+      <p style="color:#ccc;font-size:14px;margin-bottom:8px;">Your verification code:</p>
+      <div style="font-size:42px;font-weight:900;color:#4aff9e;letter-spacing:12px;text-align:center;padding:20px 0;border:1px solid #4aff9e33;border-radius:12px;background:#0a1a0a;">${otp}</div>
+      <p style="color:#666;font-size:12px;margin-top:20px;text-align:center;">Valid for <strong style="color:#4aff9e;">10 minutes</strong>. Do not share this code with anyone.</p>
+    </div>`;
     
-    if (error) throw error;
+    const response = await apiInstance.sendTransacEmail(sendSmtpEmail);
     console.log(`✅ OTP sent successfully to ${email}`);
     res.json({ success: true });
   } catch (err) {
@@ -210,7 +213,7 @@ app.post('/api/verify-otp', (req, res) => {
   res.json({ success: true });
 });
 
-// History endpoints (simplified)
+// History endpoints
 app.get('/api/all-history', async (req, res) => {
   try {
     const { email } = req.query;
@@ -242,11 +245,11 @@ app.delete('/api/history/:id', async (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'AURA AI Backend is running with Resend API!' });
+  res.json({ status: 'OK', message: 'AURA AI Backend is running with Brevo API!' });
 });
 
 app.listen(PORT, () => {
   console.log(`\n🚀 AURA Server on Port ${PORT}`);
-  console.log(`📧 Resend API configured`);
+  console.log(`📧 Brevo API configured - No domain verification needed!`);
   console.log(`🔥 Firebase connected: kira-dc450\n`);
 });
