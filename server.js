@@ -8,7 +8,16 @@ const { translate } = require('@vitalets/google-translate-api');
 const OpenAI = require('openai');
 const Groq = require('groq-sdk');
 const sharp = require('sharp');
-const brevo = require('@getbrevo/brevo');
+
+// ✅ FIXED: Brevo import
+let brevo;
+try {
+  brevo = require('@getbrevo/brevo');
+  console.log('✅ Brevo package loaded successfully');
+} catch (err) {
+  console.error('❌ Brevo package not found. Run: npm install @getbrevo/brevo');
+  process.exit(1);
+}
 
 require('dotenv').config();
 
@@ -17,11 +26,11 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || 'sk-or-v1-36eb91661
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const PORT = process.env.PORT || 5000;
 
-// Brevo setup
-let defaultClient = brevo.ApiClient.instance;
-let apiKey = defaultClient.authentications['api-key'];
-apiKey.apiKey = BREVO_API_KEY;
-let apiInstance = new brevo.TransactionalEmailsApi();
+// Initialize Brevo
+const defaultClient = brevo.ApiClient.instance;
+const apiKeyAuth = defaultClient.authentications['api-key'];
+apiKeyAuth.apiKey = BREVO_API_KEY;
+const apiInstance = new brevo.TransactionalEmailsApi();
 
 const openrouter = new OpenAI({
   apiKey: OPENROUTER_API_KEY,
