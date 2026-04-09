@@ -13,26 +13,22 @@ const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 const EMAIL_USER = process.env.EMAIL_USER || 'balaganeshpalanidurai06@gmail.com';
-const EMAIL_PASS = process.env.EMAIL_PASS || 'oyuyeeociyboheqw'; // Gmail App Password
-
-// ✅ FIX 1: Restored original working OpenRouter API key
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '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';
-
+const EMAIL_PASS = process.env.EMAIL_PASS || 'roazcaeuoyfxmktz';
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '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';
 const PORT = process.env.PORT || 5000;
 
-// ✅ FIX 2: Gmail SMTP with port 465 SSL (works on Render — port 587 is blocked there)
+// ✅ Gmail SMTP with port 465 (SSL) - Works on Render free tier
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 465,          // ← SSL port, NOT 587 (587 is blocked on Render free tier)
-  secure: true,       // ← must be true for port 465
+  port: 465,
+  secure: true,
   auth: {
     user: EMAIL_USER,
-    pass: EMAIL_PASS  // Gmail App Password (16-char, no spaces)
+    pass: EMAIL_PASS
   },
   tls: { rejectUnauthorized: false }
 });
 
-// Verify email connection on startup
 transporter.verify((error, success) => {
   if (error) {
     console.error('❌ Email config error:', error.message);
@@ -51,9 +47,7 @@ const openrouter = new OpenAI({
   }
 });
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY || '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'
-});
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY || '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' });
 
 const app = express();
 app.use(cors());
@@ -102,14 +96,14 @@ function isTamil(text) { return /[\u0B80-\u0BFF]/.test(text); }
 
 const GROQ_MODELS = ["llama-3.1-8b-instant", "llama3-8b-8192", "gemma2-9b-it", "mixtral-8x7b-32768"];
 
-// ✅ FIX 1: Working vision models with correct OpenRouter key
+// ✅ Working vision models
 const VISION_MODELS = [
   "meta-llama/llama-3.2-11b-vision-instruct:free",
   "google/gemma-3-27b-it:free",
   "qwen/qwen-2-vl-7b-instruct:free"
 ];
 
-// CHAT API — identical to doc 10
+// CHAT API
 app.post('/api/chat', async (req, res) => {
   const { message } = req.body;
   if (!message) return res.status(400).send("Message required");
@@ -148,7 +142,7 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-// VISION API — identical to doc 10
+// VISION API
 app.post('/api/vision', upload.single('image'), async (req, res) => {
   const { question } = req.body;
   const imageFile = req.file;
@@ -195,7 +189,7 @@ app.post('/api/vision', upload.single('image'), async (req, res) => {
   }
 });
 
-// ✅ FIX 2: OTP via Gmail port 465 (works on Render)
+// ✅ OTP ENDPOINT - Always return OTP in response for development
 app.post('/api/send-otp', async (req, res) => {
   const { email } = req.body;
   if (!email || !email.includes('@')) return res.status(400).json({ error: 'Valid email required' });
@@ -203,33 +197,38 @@ app.post('/api/send-otp', async (req, res) => {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   otpStore[email] = { otp, expires: Date.now() + 10 * 60 * 1000 };
 
-  console.log(`📧 Sending OTP to ${email}: ${otp}`);
+  console.log(`📧 OTP for ${email}: ${otp}`);
 
+  // Try to send email, but always return OTP in response
+  let emailSent = false;
   try {
     await transporter.sendMail({
       from: `"AURA AI" <${EMAIL_USER}>`,
       to: email,
       subject: 'AURA AI — Your Verification Code',
-      html: `
-        <div style="font-family:'Segoe UI',sans-serif;max-width:420px;margin:auto;padding:32px;background:#0d1117;border-radius:16px;border:1px solid #1a2a1a;">
-          <div style="text-align:center;margin-bottom:24px;">
-            <span style="font-size:28px;font-weight:900;letter-spacing:3px;color:#4aff9e;">AURA</span>
-            <div style="font-size:10px;color:#666;letter-spacing:2px;margin-top:2px;">ADVANCED ROBOTIC ASSISTANT</div>
-          </div>
-          <p style="color:#ccc;font-size:14px;margin-bottom:8px;">Your verification code:</p>
-          <div style="font-size:42px;font-weight:900;color:#4aff9e;letter-spacing:12px;text-align:center;padding:20px 0;border:1px solid #4aff9e33;border-radius:12px;background:#0a1a0a;">${otp}</div>
-          <p style="color:#666;font-size:12px;margin-top:20px;text-align:center;">Valid for <strong style="color:#4aff9e;">10 minutes</strong>. Do not share this code with anyone.</p>
+      html: `<div style="font-family:'Segoe UI',sans-serif;max-width:420px;margin:auto;padding:32px;background:#0d1117;border-radius:16px;border:1px solid #1a2a1a;">
+        <div style="text-align:center;margin-bottom:24px;">
+          <span style="font-size:28px;font-weight:900;letter-spacing:3px;color:#4aff9e;">AURA</span>
+          <div style="font-size:10px;color:#666;letter-spacing:2px;margin-top:2px;">ADVANCED ROBOTIC ASSISTANT</div>
         </div>
-      `
+        <p style="color:#ccc;font-size:14px;margin-bottom:8px;">Your verification code:</p>
+        <div style="font-size:42px;font-weight:900;color:#4aff9e;letter-spacing:12px;text-align:center;padding:20px 0;border:1px solid #4aff9e33;border-radius:12px;background:#0a1a0a;">${otp}</div>
+        <p style="color:#666;font-size:12px;margin-top:20px;text-align:center;">Valid for <strong style="color:#4aff9e;">10 minutes</strong>. Do not share this code with anyone.</p>
+      </div>`
     });
-    console.log(`✅ OTP sent to ${email}`);
-    res.json({ success: true });
+    emailSent = true;
+    console.log(`✅ Email sent to ${email}`);
   } catch (err) {
     console.error('❌ Email error:', err.message);
-    // Fallback — OTP still valid, user can see it in Render logs
-    console.log(`⚠️ [RENDER LOGS] OTP for ${email}: ${otp}`);
-    res.json({ success: true, dev: true });
   }
+
+  // ✅ Always return OTP - user can see it in the response
+  res.json({ 
+    success: true, 
+    otp: otp,  // ← OTP is returned directly
+    emailSent: emailSent,
+    message: emailSent ? 'OTP sent to your email' : 'Check console for OTP'
+  });
 });
 
 app.post('/api/verify-otp', (req, res) => {
@@ -243,7 +242,7 @@ app.post('/api/verify-otp', (req, res) => {
   res.json({ success: true });
 });
 
-// PER-USER HISTORY — identical to doc 10
+// PER-USER HISTORY
 app.get('/api/all-history', async (req, res) => {
   try {
     const { email } = req.query;
@@ -353,12 +352,12 @@ app.delete('/api/delete/:id', async (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'AURA AI Backend running — Gmail port 465 + Vision fixed!' });
+  res.json({ status: 'OK', message: 'AURA AI Backend running!' });
 });
 
 app.listen(PORT, () => {
   console.log(`\n🚀 AURA Server on Port ${PORT}`);
-  console.log(`📧 Gmail SMTP port 465 (SSL) configured`);
-  console.log(`👁️ Vision API ready — OpenRouter key restored`);
+  console.log(`📧 Email configured`);
+  console.log(`👁️ Vision API ready`);
   console.log(`🔥 Firebase connected: kira-dc450\n`);
 });
