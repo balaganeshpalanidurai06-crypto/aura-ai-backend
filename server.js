@@ -13,19 +13,20 @@ const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 const EMAIL_USER = process.env.EMAIL_USER || 'balaganeshpalanidurai06@gmail.com';
-const EMAIL_PASS = process.env.EMAIL_PASS || 'roazcaeuoyfxmktz';  // ✅ Updated App Password
+const BREVO_SMTP_LOGIN = process.env.BREVO_SMTP_LOGIN || 'balaganeshpalanidurai06@gmail.com';
+const BREVO_SMTP_KEY = process.env.BREVO_SMTP_KEY;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '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';
 const PORT = process.env.PORT || 5000;
 
-// ✅ Fixed transporter with timeouts
+// ✅ Brevo SMTP (Works on Render)
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
-  auth: { user: EMAIL_USER, pass: EMAIL_PASS },
-  connectionTimeout: 30000,
-  greetingTimeout: 30000,
-  socketTimeout: 30000,
+  host: 'smtp-relay.brevo.com',
+  port: 587,
+  secure: false,
+  auth: {
+    user: BREVO_SMTP_LOGIN,
+    pass: BREVO_SMTP_KEY
+  },
   tls: { rejectUnauthorized: false }
 });
 
@@ -34,7 +35,7 @@ transporter.verify((error, success) => {
   if (error) {
     console.error('❌ Email config error:', error.message);
   } else {
-    console.log('✅ Email ready to send OTPs via Gmail');
+    console.log('✅ Email ready to send OTPs via Brevo SMTP');
   }
 });
 
@@ -182,7 +183,7 @@ app.post('/api/vision', upload.single('image'), async (req, res) => {
   }
 });
 
-// OTP ENDPOINT
+// ✅ OTP ENDPOINT - Using Brevo SMTP
 app.post('/api/send-otp', async (req, res) => {
   const { email } = req.body;
   if (!email || !email.includes('@')) return res.status(400).json({ error: 'Valid email required' });
@@ -259,11 +260,11 @@ app.delete('/api/history/:id', async (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'AURA AI Backend is running with Nodemailer (port 465)!' });
+  res.json({ status: 'OK', message: 'AURA AI Backend is running with Brevo SMTP!' });
 });
 
 app.listen(PORT, () => {
   console.log(`\n🚀 AURA Server on Port ${PORT}`);
-  console.log(`📧 Gmail SMTP configured on port 465`);
+  console.log(`📧 Brevo SMTP configured`);
   console.log(`🔥 Firebase connected: kira-dc450\n`);
 });
