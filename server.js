@@ -8,7 +8,7 @@ const { translate } = require('@vitalets/google-translate-api');
 const OpenAI = require('openai');
 const Groq = require('groq-sdk');
 const sharp = require('sharp');
-const SibApiV3Sdk = require('@getbrevo/brevo');
+const brevo = require('@getbrevo/brevo');
 
 require('dotenv').config();
 
@@ -17,11 +17,11 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || 'sk-or-v1-36eb91661
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const PORT = process.env.PORT || 5000;
 
-// ✅ Brevo setup
-let defaultClient = SibApiV3Sdk.ApiClient.instance;
+// Brevo setup
+let defaultClient = brevo.ApiClient.instance;
 let apiKey = defaultClient.authentications['api-key'];
 apiKey.apiKey = BREVO_API_KEY;
-let apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+let apiInstance = new brevo.TransactionalEmailsApi();
 
 const openrouter = new OpenAI({
   apiKey: OPENROUTER_API_KEY,
@@ -167,7 +167,7 @@ app.post('/api/vision', upload.single('image'), async (req, res) => {
   }
 });
 
-// ✅ OTP ENDPOINT - Using Brevo API (No domain verification needed!)
+// ✅ OTP ENDPOINT - Using Brevo API
 app.post('/api/send-otp', async (req, res) => {
   const { email } = req.body;
   if (!email || !email.includes('@')) return res.status(400).json({ error: 'Valid email required' });
@@ -178,7 +178,7 @@ app.post('/api/send-otp', async (req, res) => {
   console.log(`📧 Sending OTP to ${email}: ${otp}`);
   
   try {
-    let sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+    let sendSmtpEmail = new brevo.SendSmtpEmail();
     sendSmtpEmail.subject = 'AURA AI — Your Verification Code';
     sendSmtpEmail.sender = { name: 'AURA AI', email: EMAIL_USER };
     sendSmtpEmail.to = [{ email: email }];
@@ -250,6 +250,6 @@ app.get('/api/health', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`\n🚀 AURA Server on Port ${PORT}`);
-  console.log(`📧 Brevo API configured - No domain verification needed!`);
+  console.log(`📧 Brevo API configured`);
   console.log(`🔥 Firebase connected: kira-dc450\n`);
 });
