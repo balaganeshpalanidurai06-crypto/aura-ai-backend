@@ -16,31 +16,30 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- CONFIG ---
 const PORT = process.env.PORT || 5000;
 const EMAIL_USER = process.env.EMAIL_USER || 'balaganeshpalanidurai06@gmail.com';
 const EMAIL_PASS = process.env.EMAIL_PASS || 'roazcaeuoyfxmktz';
 
-// --- GMAIL SMTP (RENDER FIXED) ---
+// --- GMAIL SMTP FIX ---
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
+  service: 'gmail', // Use service instead of host for better Gmail handling
   auth: { user: EMAIL_USER, pass: EMAIL_PASS },
-  tls: { rejectUnauthorized: false },
-  family: 4 // ✅ Force IPv4 to prevent Render connection errors
+  tls: { rejectUnauthorized: false }
 });
 
 // --- AI INITIALIZATION ---
 const openrouter = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: "https://openrouter.ai/api/v1",
-  defaultHeaders: { 'HTTP-Referer': 'https://aura-ai.vercel.app', 'X-Title': 'AURA AI' }
+  defaultHeaders: { 
+    'HTTP-Referer': 'https://aura-ai.vercel.app', 
+    'X-Title': 'AURA AI' 
+  }
 });
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// --- FIREBASE INITIALIZATION ---
+// --- FIREBASE ---
 const serviceAccount = {
   type: "service_account",
   project_id: "kira-dc450",
@@ -63,7 +62,7 @@ const isTamil = (text) => /[\u0B80-\u0BFF]/.test(text);
 
 // --- ENDPOINTS ---
 
-// 1. CHAT API (Groq with Fallback)
+// 1. CHAT (Stable Groq Models)
 app.post('/api/chat', async (req, res) => {
   const { message } = req.body;
   if (!message) return res.status(400).send("No message");
@@ -74,7 +73,7 @@ app.post('/api/chat', async (req, res) => {
   }
 
   res.setHeader("Content-Type", "text/event-stream");
-  const models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
+  const models = ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"];
 
   for (const model of models) {
     try {
@@ -86,41 +85,44 @@ app.post('/api/chat', async (req, res) => {
         res.write(chunk.choices[0]?.delta?.content || "");
       }
       return res.end();
-    } catch (e) { console.error(`${model} failed`); }
+    } catch (e) { console.error(`Groq ${model} failed`); }
   }
-  res.end("Service Busy");
+  res.end("AURA is catching its breath. Try again!");
 });
 
-// 2. VISION API (Updated Models)
+// 2. VISION (Switch to more stable free models)
 app.post('/api/vision', upload.single('image'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No image" });
   try {
-    const buffer = await sharp(req.file.path).resize(800).toBuffer();
+    const buffer = await sharp(req.file.path).resize(600).jpeg({ quality: 80 }).toBuffer();
     const base64 = `data:image/jpeg;base64,${buffer.toString('base64')}`;
     fs.unlinkSync(req.file.path);
 
-    // Using stable vision models
-    const models = ["google/gemini-pro-1.5-exp", "openai/gpt-4o-mini"];
-    let responseText = "";
+    // Using Llama 3.2 Vision and Qwen - Higher success rate on OpenRouter Free
+    const visionModels = [
+      "meta-llama/llama-3.2-11b-vision-instruct:free",
+      "google/gemini-pro-1.5-exp" // Keep as fallback
+    ];
 
-    for (const model of models) {
+    let responseText = "";
+    for (const model of visionModels) {
       try {
         const result = await openrouter.chat.completions.create({
           model,
           messages: [{ role: "user", content: [
-            { type: "text", text: req.body.question || "Describe this image" },
+            { type: "text", text: req.body.question || "Analyze this image" },
             { type: "image_url", image_url: { url: base64 } }
           ]}]
         });
         responseText = result.choices[0].message.content;
-        break;
-      } catch (e) { console.error(`Vision ${model} failed`); }
+        if (responseText) break;
+      } catch (e) { console.error(`Vision ${model} failed:`, e.message); }
     }
-    res.json({ response: responseText || "Vision temporarily unavailable" });
+    res.json({ response: responseText || "I can see it, but my vision circuits are a bit hazy. Try again!" });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 3. OTP API
+// 3. OTP (With Response Fallback)
 app.post('/api/send-otp', async (req, res) => {
   const { email } = req.body;
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -130,13 +132,17 @@ app.post('/api/send-otp', async (req, res) => {
     await transporter.sendMail({
       from: `"AURA AI" <${EMAIL_USER}>`,
       to: email,
-      subject: 'AURA AI - Code',
-      html: `<h1 style="color:#4aff9e; text-align:center;">${otp}</h1>`
+      subject: 'AURA AI Verification Code',
+      html: `<div style="background:#000; color:#4aff9e; padding:20px; text-align:center; border-radius:10px;">
+              <h2>Verification Code</h2>
+              <h1 style="font-size:40px;">${otp}</h1>
+             </div>`
     });
-    res.json({ success: true, otp }); // Sending OTP in response for fallback
+    res.json({ success: true });
   } catch (err) {
-    console.log("Mail Error, log OTP:", otp);
-    res.json({ success: true, otp, dev: true });
+    console.error("Mail Error:", err.message);
+    // Crucial: Return OTP in JSON so frontend can handle it if mail fails
+    res.json({ success: true, otp, dev: true }); 
   }
 });
 
@@ -146,22 +152,9 @@ app.post('/api/verify-otp', (req, res) => {
     delete otpStore[email];
     return res.json({ success: true });
   }
-  res.status(400).json({ error: "Invalid OTP" });
+  res.status(400).json({ error: "Invalid or expired OTP" });
 });
 
-// 4. HISTORY (Firebase)
-app.post('/api/save-history', async (req, res) => {
-  try {
-    const { type, question, answer, userEmail } = req.body;
-    if (!userEmail || userEmail === 'guest') return res.json({ success: true });
-    await db.collection('all_history').add({
-      type, question, answer, userEmail,
-      timestamp: new Date().toISOString()
-    });
-    res.json({ success: true });
-  } catch (err) { res.status(500).send(err.message); }
-});
+app.get('/api/health', (req, res) => res.json({ status: "AURA LIVE", port: PORT }));
 
-app.get('/api/health', (req, res) => res.json({ status: "AURA ONLINE" }));
-
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 AURA Server running on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`🚀 AURA Online on ${PORT}`));
