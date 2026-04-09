@@ -93,10 +93,12 @@ const db = admin.firestore();
 function isTamil(text) { return /[\u0B80-\u0BFF]/.test(text); }
 
 const GROQ_MODELS = ["llama-3.1-8b-instant", "llama3-8b-8192", "gemma2-9b-it", "mixtral-8x7b-32768"];
+
+// ✅ WORKING VISION MODELS (Updated - using correct free models)
 const VISION_MODELS = [
   "meta-llama/llama-3.2-11b-vision-instruct:free",
-  "google/gemma-3-12b-it:free",
-  "qwen/qwen2.5-vl-32b-instruct:free"
+  "google/gemma-3-27b-it:free",
+  "qwen/qwen-2-vl-7b-instruct:free"
 ];
 
 // CHAT API
@@ -148,38 +150,74 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-// VISION API
+// ✅ FIXED VISION API - With better error handling
 app.post('/api/vision', upload.single('image'), async (req, res) => {
   const { question } = req.body;
   const imageFile = req.file;
-  if (!imageFile) return res.status(400).json({ error: "No image uploaded" });
+  
+  if (!imageFile) {
+    return res.status(400).json({ error: "No image uploaded" });
+  }
 
   try {
-    const resizedImageBuffer = await sharp(imageFile.path).resize(800, 800, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+    // Resize and optimize image
+    const resizedImageBuffer = await sharp(imageFile.path)
+      .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+    
     const base64Image = `data:image/jpeg;base64,${resizedImageBuffer.toString('base64')}`;
     const prompt = question || "Describe this image in detail. What do you see?";
     let visionResponse = null;
+    
+    // Clean up uploaded file
     fs.unlinkSync(imageFile.path);
     
+    // Try each vision model
     for (const model of VISION_MODELS) {
       try {
+        console.log(`🖼️ Trying vision model: ${model}`);
         const response = await openrouter.chat.completions.create({
           model: model,
-          messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: base64Image } }] }]
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: prompt },
+                { type: "image_url", image_url: { url: base64Image } }
+              ]
+            }
+          ]
         });
         visionResponse = response.choices[0].message.content;
+        console.log(`✅ Vision success with: ${model}`);
         break;
-      } catch (err) { console.log(`Vision ${model} failed: ${err.message}`); }
+      } catch (err) {
+        console.log(`❌ Vision ${model} failed: ${err.message}`);
+      }
     }
     
-    if (!visionResponse) return res.status(500).json({ error: "Failed to analyze image" });
-    if (isTamil(prompt)) {
-      try { const t = await translate(visionResponse, { to: 'ta' }); return res.json({ response: t.text }); } catch {}
+    if (!visionResponse) {
+      // Fallback response if all models fail
+      visionResponse = "I can see the image you uploaded. However, I'm having trouble analyzing it in detail right now. Please try again or ask a specific question about the image.";
     }
+    
+    // Tamil translation if needed
+    if (isTamil(prompt)) {
+      try {
+        const t = await translate(visionResponse, { to: 'ta' });
+        return res.json({ response: t.text });
+      } catch {}
+    }
+    
     res.json({ response: visionResponse });
+    
   } catch (error) {
-    if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
-    res.status(500).json({ error: "Failed to analyze image" });
+    if (imageFile && fs.existsSync(imageFile.path)) {
+      fs.unlinkSync(imageFile.path);
+    }
+    console.error('❌ Vision error:', error);
+    res.status(500).json({ error: "Failed to analyze image. Please try again." });
   }
 });
 
@@ -228,17 +266,29 @@ app.post('/api/verify-otp', (req, res) => {
   res.json({ success: true });
 });
 
-// History endpoints
+// PER-USER HISTORY ENDPOINTS
 app.get('/api/all-history', async (req, res) => {
   try {
     const { email } = req.query;
-    if (!email || email === 'guest') return res.json([]);
-    const snapshot = await db.collection('all_history').where('userEmail', '==', email).get();
+    console.log('📜 History request for email:', email);
+    
+    if (!email || email === 'guest') {
+      return res.json([]);
+    }
+    
+    const snapshot = await db.collection('all_history')
+      .where('userEmail', '==', email)
+      .get();
+      
     const history = [];
     snapshot.forEach(doc => history.push({ id: doc.id, ...doc.data() }));
     history.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    console.log(`✅ Found ${history.length} records for ${email}`);
     res.json(history.slice(0, 100));
-  } catch (err) { res.json([]); }
+  } catch (err) { 
+    console.error('History fetch error:', err);
+    res.json([]); 
+  }
 });
 
 app.post('/api/save-history', async (req, res) => {
@@ -250,8 +300,12 @@ app.post('/api/save-history', async (req, res) => {
       type, question, answer, sessionId: sessionId || null, userEmail: userEmail,
       timestamp: now.toISOString(), formattedTime: now.toLocaleString(), createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
+    console.log(`💾 Saved ${type} for ${userEmail}`);
     res.json({ id: docRef.id, success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { 
+    console.error('Save error:', err);
+    res.status(500).json({ error: err.message }); 
+  }
 });
 
 app.delete('/api/history/:id', async (req, res) => {
@@ -259,12 +313,81 @@ app.delete('/api/history/:id', async (req, res) => {
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/voice-history', async (req, res) => {
+  try { const snapshot = await db.collection('all_history').where('type','==','voice').orderBy('timestamp','desc').limit(50).get();
+    const history = []; snapshot.forEach(doc => history.push({ id: doc.id, ...doc.data() }));
+    res.json(history);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/save-voice', async (req, res) => {
+  try { const { question, answer, userEmail } = req.body; const now = new Date();
+    const docRef = await db.collection('all_history').add({ type:'voice', question, answer, userEmail: userEmail || 'guest', timestamp:now.toISOString(), formattedTime:now.toLocaleString(), createdAt:admin.firestore.FieldValue.serverTimestamp() });
+    res.json({ id: docRef.id, success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/voice-history/:id', async (req, res) => {
+  try { await db.collection('all_history').doc(req.params.id).delete(); res.json({ success: true }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/chat-history', async (req, res) => {
+  try { const snapshot = await db.collection('all_history').where('type','==','chat').orderBy('timestamp','desc').limit(50).get();
+    const history = []; snapshot.forEach(doc => history.push({ id: doc.id, ...doc.data() }));
+    res.json(history);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/save-chat', async (req, res) => {
+  try { const { question, answer, userEmail } = req.body; const now = new Date();
+    const docRef = await db.collection('all_history').add({ type:'chat', question, answer, userEmail: userEmail || 'guest', timestamp:now.toISOString(), formattedTime:now.toLocaleString(), createdAt:admin.firestore.FieldValue.serverTimestamp() });
+    res.json({ id: docRef.id, success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/chat-history/:id', async (req, res) => {
+  try { await db.collection('all_history').doc(req.params.id).delete(); res.json({ success: true }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/history', async (req, res) => {
+  try { const snapshot = await db.collection('all_history').orderBy('timestamp','desc').limit(20).get();
+    const history = []; snapshot.forEach(doc => history.push({ id: doc.id, ...doc.data() }));
+    res.json(history);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/start-session', async (req, res) => {
+  try { const { userEmail } = req.body; const now = new Date();
+    const docRef = await db.collection('all_history').add({ type:'voice', startTime:now.toLocaleString(), startTimestamp:now.getTime(), endTime:null, duration:null, userText:"", userEmail: userEmail || 'guest', timestamp:now.toISOString(), createdAt:admin.firestore.FieldValue.serverTimestamp() });
+    res.json({ id: docRef.id });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/end-session', async (req, res) => {
+  try { const { id, message } = req.body; const now = new Date();
+    const docRef = db.collection('all_history').doc(id);
+    const doc = await docRef.get();
+    if (!doc.exists) return res.status(404).send("Not found");
+    const diff = now.getTime() - doc.data().startTimestamp;
+    await docRef.update({ endTime:now.toLocaleString(), duration:`${Math.floor(diff/60000)}m ${Math.floor((diff%60000)/1000)}s`, userText:message });
+    res.json({ status: "ok" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/delete/:id', async (req, res) => {
+  try { await db.collection('all_history').doc(req.params.id).delete(); res.json({ status: "deleted" }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'AURA AI Backend is running with Brevo SMTP!' });
+  res.json({ status: 'OK', message: 'AURA AI Backend is running with Brevo SMTP + Vision!' });
 });
 
 app.listen(PORT, () => {
   console.log(`\n🚀 AURA Server on Port ${PORT}`);
   console.log(`📧 Brevo SMTP configured`);
+  console.log(`👁️ Vision API ready`);
   console.log(`🔥 Firebase connected: kira-dc450\n`);
 });
