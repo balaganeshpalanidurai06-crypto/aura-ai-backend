@@ -20,14 +20,17 @@ const PORT = process.env.PORT || 5000;
 const EMAIL_USER = process.env.EMAIL_USER || 'balaganeshpalanidurai06@gmail.com';
 const EMAIL_PASS = process.env.EMAIL_PASS || 'roazcaeuoyfxmktz';
 
-// --- GMAIL SMTP FIX ---
+// --- 📧 GMAIL SMTP (RENDER STABILITY FIX) ---
 const transporter = nodemailer.createTransport({
-  service: 'gmail', // Use service instead of host for better Gmail handling
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true,
   auth: { user: EMAIL_USER, pass: EMAIL_PASS },
-  tls: { rejectUnauthorized: false }
+  tls: { rejectUnauthorized: false },
+  family: 4 // ✅ CRITICAL: Forces IPv4 to fix ENETUNREACH on Render
 });
 
-// --- AI INITIALIZATION ---
+// --- 🤖 AI INITIALIZATION ---
 const openrouter = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: "https://openrouter.ai/api/v1",
@@ -39,7 +42,7 @@ const openrouter = new OpenAI({
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// --- FIREBASE ---
+// --- 🔥 FIREBASE ---
 const serviceAccount = {
   type: "service_account",
   project_id: "kira-dc450",
@@ -52,7 +55,7 @@ if (!admin.apps.length && serviceAccount.private_key) {
 }
 const db = admin.apps.length ? admin.firestore() : null;
 
-// --- STORAGE ---
+// --- 📁 STORAGE ---
 const uploadDir = '/tmp/uploads';
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 const upload = multer({ dest: uploadDir });
@@ -60,7 +63,7 @@ const upload = multer({ dest: uploadDir });
 const otpStore = {};
 const isTamil = (text) => /[\u0B80-\u0BFF]/.test(text);
 
-// --- ENDPOINTS ---
+// --- 🛠️ ENDPOINTS ---
 
 // 1. CHAT (Stable Groq Models)
 app.post('/api/chat', async (req, res) => {
@@ -87,10 +90,10 @@ app.post('/api/chat', async (req, res) => {
       return res.end();
     } catch (e) { console.error(`Groq ${model} failed`); }
   }
-  res.end("AURA is catching its breath. Try again!");
+  res.end("AURA system rebooting... Try again.");
 });
 
-// 2. VISION (Switch to more stable free models)
+// 2. 👁️ VISION (OpenRouter Free Model Fallback)
 app.post('/api/vision', upload.single('image'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No image" });
   try {
@@ -98,31 +101,33 @@ app.post('/api/vision', upload.single('image'), async (req, res) => {
     const base64 = `data:image/jpeg;base64,${buffer.toString('base64')}`;
     fs.unlinkSync(req.file.path);
 
-    // Using Llama 3.2 Vision and Qwen - Higher success rate on OpenRouter Free
+    // ✅ Using the most reliable models available for free right now
     const visionModels = [
-      "meta-llama/llama-3.2-11b-vision-instruct:free",
-      "google/gemini-pro-1.5-exp" // Keep as fallback
+      "google/gemini-flash-1.5-8b", 
+      "mistralai/pixtral-12b:free",
+      "google/gemini-pro-1.5-exp"
     ];
 
     let responseText = "";
     for (const model of visionModels) {
       try {
+        console.log(`Trying Vision: ${model}`);
         const result = await openrouter.chat.completions.create({
           model,
           messages: [{ role: "user", content: [
-            { type: "text", text: req.body.question || "Analyze this image" },
+            { type: "text", text: req.body.question || "Identify everything in this image." },
             { type: "image_url", image_url: { url: base64 } }
           ]}]
         });
         responseText = result.choices[0].message.content;
         if (responseText) break;
-      } catch (e) { console.error(`Vision ${model} failed:`, e.message); }
+      } catch (e) { console.error(`${model} down.`); }
     }
-    res.json({ response: responseText || "I can see it, but my vision circuits are a bit hazy. Try again!" });
+    res.json({ response: responseText || "Vision is currently under maintenance." });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 3. OTP (With Response Fallback)
+// 3. 🔑 OTP (IPv4 Fixed)
 app.post('/api/send-otp', async (req, res) => {
   const { email } = req.body;
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -132,17 +137,17 @@ app.post('/api/send-otp', async (req, res) => {
     await transporter.sendMail({
       from: `"AURA AI" <${EMAIL_USER}>`,
       to: email,
-      subject: 'AURA AI Verification Code',
-      html: `<div style="background:#000; color:#4aff9e; padding:20px; text-align:center; border-radius:10px;">
-              <h2>Verification Code</h2>
-              <h1 style="font-size:40px;">${otp}</h1>
+      subject: 'AURA AI - Verification',
+      html: `<div style="background:#0a0a0a; color:#4aff9e; padding:30px; text-align:center; border:2px solid #4aff9e;">
+              <h2>AURA Verification Code</h2>
+              <h1 style="font-size:50px; letter-spacing:10px;">${otp}</h1>
              </div>`
     });
-    res.json({ success: true });
+    res.json({ success: true, message: "Email sent" });
   } catch (err) {
     console.error("Mail Error:", err.message);
-    // Crucial: Return OTP in JSON so frontend can handle it if mail fails
-    res.json({ success: true, otp, dev: true }); 
+    // ✅ Fallback: Backend returns OTP if email fails so you can still log in
+    res.json({ success: true, otp, dev: true, message: "Email failed, see response" }); 
   }
 });
 
@@ -152,9 +157,9 @@ app.post('/api/verify-otp', (req, res) => {
     delete otpStore[email];
     return res.json({ success: true });
   }
-  res.status(400).json({ error: "Invalid or expired OTP" });
+  res.status(400).json({ error: "Invalid OTP" });
 });
 
-app.get('/api/health', (req, res) => res.json({ status: "AURA LIVE", port: PORT }));
+app.get('/api/health', (req, res) => res.json({ status: "AURA ONLINE" }));
 
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 AURA Online on ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`🚀 AURA Core Online on ${PORT}`));
