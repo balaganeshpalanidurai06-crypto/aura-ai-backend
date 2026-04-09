@@ -14,10 +14,11 @@ require('dotenv').config();
 
 const EMAIL_USER = process.env.EMAIL_USER || 'balaganeshpalanidurai06@gmail.com';
 const EMAIL_PASS = process.env.EMAIL_PASS || 'roazcaeuoyfxmktz';
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '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';
+// ✅ UPDATED: New OpenRouter API key (change this to your new key)
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || 'sk-or-v1-YOUR_NEW_OPENROUTER_KEY_HERE';
 const PORT = process.env.PORT || 5000;
 
-// ✅ Gmail SMTP with port 465 (SSL) - Works on Render free tier
+// ✅ Gmail SMTP with port 465 (SSL) + IPv4 fix
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 465,
@@ -26,7 +27,8 @@ const transporter = nodemailer.createTransport({
     user: EMAIL_USER,
     pass: EMAIL_PASS
   },
-  tls: { rejectUnauthorized: false }
+  tls: { rejectUnauthorized: false },
+  family: 4  // ✅ Force IPv4 - Fixes ENETUNREACH error
 });
 
 transporter.verify((error, success) => {
@@ -34,7 +36,7 @@ transporter.verify((error, success) => {
     console.error('❌ Email config error:', error.message);
     console.log('📝 OTPs will be logged to console instead');
   } else {
-    console.log('✅ Gmail SMTP ready (port 465)');
+    console.log('✅ Gmail SMTP ready (port 465, IPv4)');
   }
 });
 
@@ -74,7 +76,7 @@ const upload = multer({
   }
 });
 
-// Firebase config
+// ✅ Firebase config - UNCHANGED (keep as is)
 const serviceAccount = {
   "type": "service_account",
   "project_id": "kira-dc450",
@@ -189,7 +191,7 @@ app.post('/api/vision', upload.single('image'), async (req, res) => {
   }
 });
 
-// ✅ OTP ENDPOINT - Always return OTP in response for development
+// ✅ OTP ENDPOINT - Always return OTP in response
 app.post('/api/send-otp', async (req, res) => {
   const { email } = req.body;
   if (!email || !email.includes('@')) return res.status(400).json({ error: 'Valid email required' });
@@ -199,7 +201,6 @@ app.post('/api/send-otp', async (req, res) => {
 
   console.log(`📧 OTP for ${email}: ${otp}`);
 
-  // Try to send email, but always return OTP in response
   let emailSent = false;
   try {
     await transporter.sendMail({
@@ -222,10 +223,9 @@ app.post('/api/send-otp', async (req, res) => {
     console.error('❌ Email error:', err.message);
   }
 
-  // ✅ Always return OTP - user can see it in the response
   res.json({ 
     success: true, 
-    otp: otp,  // ← OTP is returned directly
+    otp: otp,
     emailSent: emailSent,
     message: emailSent ? 'OTP sent to your email' : 'Check console for OTP'
   });
@@ -357,7 +357,7 @@ app.get('/api/health', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`\n🚀 AURA Server on Port ${PORT}`);
-  console.log(`📧 Email configured`);
+  console.log(`📧 Email configured with IPv4 fix`);
   console.log(`👁️ Vision API ready`);
   console.log(`🔥 Firebase connected: kira-dc450\n`);
 });
